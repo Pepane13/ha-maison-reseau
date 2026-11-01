@@ -1,0 +1,70 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Livebox",
+        "description": "Surveillance en lecture seule. Le mot de passe administrateur de la Livebox n’est conservé que dans cette intégration.",
+        "data": {
+          "host": "Adresse",
+          "password": "Mot de passe administrateur"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Livebox",
+        "data": {
+          "password": "Mot de passe administrateur"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Mot de passe refusé",
+      "cannot_connect": "Livebox injoignable"
+    },
+    "abort": {
+      "already_configured": "Déjà configurée",
+      "reauth_successful": "Réauthentification réussie"
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "internet": {
+        "name": "Internet"
+      },
+      "dmz": {
+        "name": "DMZ active"
+      },
+      "upnp": {
+        "name": "UPnP actif"
+      },
+      "remote_access": {
+        "name": "Accès à distance actif"
+      },
+      "guest_wifi": {
+        "name": "Wi-Fi invités"
+      }
+    },
+    "sensor": {
+      "public_ip": {
+        "name": "IP publique"
+      },
+      "firewall_level": {
+        "name": "Niveau pare-feu (IPv4)"
+      },
+      "firewall_ipv6_level": {
+        "name": "Niveau pare-feu (IPv6)"
+      },
+      "port_forwarding": {
+        "name": "Redirections de ports"
+      },
+      "ipv6_pinholes": {
+        "name": "Ouvertures IPv6"
+      },
+      "devices_active": {
+        "name": "Appareils actifs"
+      },
+      "unavailable_checks": {
+        "name": "Contrôles indisponibles"
+      }
+    }
+  }
+}

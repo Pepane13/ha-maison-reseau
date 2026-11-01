@@ -1,0 +1,12 @@
+{
+  "domain": "maison_reseau",
+  "name": "Maison Réseau",
+  "codeowners": ["@Pepane13"],
+  "config_flow": true,
+  "documentation": "https://github.com/Pepane13/ha-maison-reseau",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Pepane13/ha-maison-reseau/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
