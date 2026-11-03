@@ -112,7 +112,31 @@ if (-not $installPath -or -not (Get-Service $svcName -ErrorAction SilentlyContin
     Warn 'HASS.Agent Satellite service not found: run Install-HassAgent.ps1 first. Scheduled tasks are in place anyway.'
 } else {
     $sensorsFile = Join-Path $installPath 'config\sensors.json'
-    $sensors = @(if (Test-Path $sensorsFile) { Get-Content $sensorsFile -Raw | ConvertFrom-Json })
+    function Read-SensorList($path) {
+        # Returns the HASS.Agent sensor list as a flat sequence of objects.
+        # - Windows PowerShell 5.1 emits a JSON array from ConvertFrom-Json as ONE object: wrapping it in @()
+        #   and appending to it nested the list, which ConvertTo-Json then wrote as {"value":[...],"Count":n}
+        #   (HASS.Agent could no longer read its sensors). Both nested forms are unwrapped here.
+        # - The file is read as UTF-8 explicitly, and names already double-encoded (UTF-8 read as ANSI) are repaired.
+        if (-not (Test-Path $path)) { return }
+        $raw = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+        $latin1 = [Text.Encoding]::GetEncoding(28591)
+        $queue = New-Object System.Collections.Queue
+        foreach ($item in @($raw)) { $queue.Enqueue(@($item, 0)) }
+        while ($queue.Count -gt 0) {
+            $pair = $queue.Dequeue(); $it = $pair[0]; $lvl = $pair[1]
+            if ($lvl -gt 3 -or -not $it) { continue }
+            if ($it -is [array]) { foreach ($sub in $it) { $queue.Enqueue(@($sub, ($lvl + 1))) } }
+            elseif (($it.PSObject.Properties.Name -contains 'value') -and -not ($it.PSObject.Properties.Name -contains 'Type')) {
+                foreach ($sub in @($it.value)) { $queue.Enqueue(@($sub, ($lvl + 1))) }
+            }
+            elseif ($it.Type) {
+                if ("$($it.Name)".Contains([string][char]0xC3)) { $it.Name = [Text.Encoding]::UTF8.GetString($latin1.GetBytes($it.Name)) }
+                $it
+            }
+        }
+    }
+    $sensors = @(Read-SensorList $sensorsFile)
     # Keep the Id of an existing winget sensor: a new Id would create a duplicate entity (_2) in Home Assistant.
     $keepId = @{}; foreach ($e in $sensors) { if ($e.EntityName -like 'winget_*' -and $e.Id) { $keepId[$e.EntityName] = $e.Id } }
     $sensors = @($sensors | Where-Object { $_.EntityName -notlike 'winget_*' })
@@ -124,9 +148,9 @@ if (-not $installPath -or -not (Get-Service $svcName -ErrorAction SilentlyContin
     function NewSensor($entity, $name, $query) {
         [pscustomobject][ordered]@{ Type = 'PowershellSensor'; Id = $(if ($keepId[$entity]) { $keepId[$entity] } else { [guid]::NewGuid().ToString() }); Name = $name; EntityName = $entity; UpdateInterval = 900; Query = $query; Scope = ''; WindowName = ''; Category = ''; Counter = ''; Instance = ''; IgnoreAvailability = $false; ApplyRounding = $false; Round = $null; AdvancedSettings = '' }
     }
-    $sensors += NewSensor 'winget_en_attente' 'Mises à jour winget en attente' $qCount
-    $sensors += NewSensor 'winget_liste' 'Liste des mises à jour winget' $qList
-    $sensors += NewSensor 'winget_derniere_maj' 'Dernière mise à jour winget' $qLast
+    $sensors += NewSensor 'winget_en_attente' "Mises $([char]0xE0) jour winget en attente" $qCount
+    $sensors += NewSensor 'winget_liste' "Liste des mises $([char]0xE0) jour winget" $qList
+    $sensors += NewSensor 'winget_derniere_maj' "Derni$([char]0xE8)re mise $([char]0xE0) jour winget" $qLast
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     for ($i = 0; $i -lt 6 -and (Get-Service $svcName).Status -ne 'Stopped'; $i++) { try { Stop-Service $svcName -Force -ErrorAction Stop } catch { Start-Sleep 5 } }
     [IO.File]::WriteAllText($sensorsFile, (ConvertTo-Json @($sensors) -Depth 5), $utf8)

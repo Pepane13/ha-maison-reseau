@@ -163,13 +163,40 @@ $psAvName = @'
 '@
 $psBitlocker = @'
 $v = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
-if (-not $v) { 'inconnu' } elseif ($v.ProtectionStatus -eq 'On') { 'actif' } else { 'inactif' }
+if (-not $v) { 'inconnu' }
+elseif ($v.ProtectionStatus -eq 'On') { 'actif' }
+elseif ($v.VolumeStatus -in 'FullyEncrypted','EncryptionInProgress') { 'suspendu' }
+else { 'inactif' }
 '@
 
 # Re-running the script must keep each sensor's Id: a new Id is a new MQTT unique_id, which leaves
 # a stale duplicate (entity_id suffixed _2) in Home Assistant. Sensors added by other scripts are kept.
 $sensorsPath = Join-Path $cfg 'sensors.json'
-$existing = @(if (Test-Path $sensorsPath) { try { Get-Content $sensorsPath -Raw | ConvertFrom-Json } catch { } })
+function Read-SensorList($path) {
+    # Returns the HASS.Agent sensor list as a flat sequence of objects.
+    # - Windows PowerShell 5.1 emits a JSON array from ConvertFrom-Json as ONE object: wrapping it in @()
+    #   and appending to it nested the list, which ConvertTo-Json then wrote as {"value":[...],"Count":n}
+    #   (HASS.Agent could no longer read its sensors). Both nested forms are unwrapped here.
+    # - The file is read as UTF-8 explicitly, and names already double-encoded (UTF-8 read as ANSI) are repaired.
+    if (-not (Test-Path $path)) { return }
+    $raw = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+    $latin1 = [Text.Encoding]::GetEncoding(28591)
+    $queue = New-Object System.Collections.Queue
+    foreach ($item in @($raw)) { $queue.Enqueue(@($item, 0)) }
+    while ($queue.Count -gt 0) {
+        $pair = $queue.Dequeue(); $it = $pair[0]; $lvl = $pair[1]
+        if ($lvl -gt 3 -or -not $it) { continue }
+        if ($it -is [array]) { foreach ($sub in $it) { $queue.Enqueue(@($sub, ($lvl + 1))) } }
+        elseif (($it.PSObject.Properties.Name -contains 'value') -and -not ($it.PSObject.Properties.Name -contains 'Type')) {
+            foreach ($sub in @($it.value)) { $queue.Enqueue(@($sub, ($lvl + 1))) }
+        }
+        elseif ($it.Type) {
+            if ("$($it.Name)".Contains([string][char]0xC3)) { $it.Name = [Text.Encoding]::UTF8.GetString($latin1.GetBytes($it.Name)) }
+            $it
+        }
+    }
+}
+$existing = @(try { Read-SensorList $sensorsPath } catch { Warn "sensors.json unreadable, rebuilt: $($_.Exception.Message)" })
 $keepId = @{}; foreach ($e in $existing) { if ($e.EntityName -and $e.Id) { $keepId[$e.EntityName] = $e.Id } }
 function Sensor($type, $entity, $name, $query = '') {
     [ordered]@{
@@ -184,7 +211,7 @@ $sensors = @(
     (Sensor 'PowershellSensor'     'pare_feu'       'Pare-feu'         $psFirewall),
     (Sensor 'PowershellSensor'     'bitlocker'      'Chiffrement disque' $psBitlocker),
     (Sensor 'WindowsUpdatesSensors' 'windows_updates' 'Windows Update'),
-    (Sensor 'LastBootSensor'       'dernier_demarrage' 'Dernier démarrage'),
+    (Sensor 'LastBootSensor'       'dernier_demarrage' "Dernier d$([char]0xE9)marrage"),
     (Sensor 'LoggedUsersSensor'    'sessions'       'Sessions ouvertes')
 )
 $mine = @($sensors | ForEach-Object { $_.EntityName })
