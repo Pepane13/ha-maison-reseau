@@ -14,7 +14,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_HOST, CONF_PASSWORD, DOMAIN, SECURITY_INTERVAL, STATUS_INTERVAL
+from .const import CONF_HOST, CONF_PASSWORD, DOMAIN, SECURITY_INTERVAL, SPEEDTEST_INTERVAL, STATUS_INTERVAL
 from .livebox import LiveboxAuthError, LiveboxClient, LiveboxError
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,8 +67,19 @@ class SecurityCoordinator(_Base):
         return data
 
 
+class SpeedtestCoordinator(_Base):
+    """Reads the last Livebox speed test (read-only); a test is started by the button."""
+
+    def __init__(self, hass, entry, client):
+        super().__init__(hass, entry, client, "speedtest", SPEEDTEST_INTERVAL)
+
+    async def _fetch(self):
+        return await self.client.get_speedtest_results()
+
+
 @dataclass
 class MaisonReseauData:
     client: LiveboxClient
     status: StatusCoordinator
     security: SecurityCoordinator
+    speedtest: SpeedtestCoordinator

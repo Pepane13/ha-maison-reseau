@@ -64,6 +64,23 @@
       },
       "unavailable_checks": {
         "name": "Contrôles indisponibles"
+      },
+      "speedtest_download": {
+        "name": "Débit descendant (test Livebox)"
+      },
+      "speedtest_upload": {
+        "name": "Débit montant (test Livebox)"
+      },
+      "speedtest_latency": {
+        "name": "Latence (test Livebox)"
+      },
+      "speedtest_last_run": {
+        "name": "Dernier test de débit"
+      }
+    },
+    "button": {
+      "run_speedtest": {
+        "name": "Lancer le test de débit"
       }
     }
   }

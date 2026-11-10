@@ -9,3 +9,4 @@ DEFAULT_HOST = "192.168.1.1"
 
 STATUS_INTERVAL = timedelta(minutes=1)
 SECURITY_INTERVAL = timedelta(minutes=15)
+SPEEDTEST_INTERVAL = timedelta(minutes=30)

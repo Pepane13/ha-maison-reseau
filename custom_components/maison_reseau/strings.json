@@ -1,22 +1,87 @@
 {
   "config": {
     "step": {
-      "user": {"title": "Livebox", "description": "Read-only monitoring. The Livebox admin password is stored only in this entry.", "data": {"host": "Host", "password": "Admin password"}},
-      "reauth_confirm": {"title": "Livebox", "data": {"password": "Admin password"}}
+      "user": {
+        "title": "Livebox",
+        "description": "Read-only monitoring. The Livebox admin password is stored only in this entry.",
+        "data": {
+          "host": "Host",
+          "password": "Admin password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Livebox",
+        "data": {
+          "password": "Admin password"
+        }
+      }
     },
-    "error": {"invalid_auth": "Invalid password", "cannot_connect": "Cannot reach the Livebox"},
-    "abort": {"already_configured": "Already configured", "reauth_successful": "Re-authentication successful"}
+    "error": {
+      "invalid_auth": "Invalid password",
+      "cannot_connect": "Cannot reach the Livebox"
+    },
+    "abort": {
+      "already_configured": "Already configured",
+      "reauth_successful": "Re-authentication successful"
+    }
   },
   "entity": {
     "binary_sensor": {
-      "internet": {"name": "Internet"}, "dmz": {"name": "DMZ enabled"}, "upnp": {"name": "UPnP enabled"},
-      "remote_access": {"name": "Remote access enabled"}, "guest_wifi": {"name": "Guest Wi-Fi"}
+      "internet": {
+        "name": "Internet"
+      },
+      "dmz": {
+        "name": "DMZ enabled"
+      },
+      "upnp": {
+        "name": "UPnP enabled"
+      },
+      "remote_access": {
+        "name": "Remote access enabled"
+      },
+      "guest_wifi": {
+        "name": "Guest Wi-Fi"
+      }
     },
     "sensor": {
-      "public_ip": {"name": "Public IP"}, "firewall_level": {"name": "Firewall level (IPv4)"},
-      "firewall_ipv6_level": {"name": "Firewall level (IPv6)"}, "port_forwarding": {"name": "Port forwarding rules"},
-      "ipv6_pinholes": {"name": "IPv6 pinholes"}, "devices_active": {"name": "Active devices"},
-      "unavailable_checks": {"name": "Unavailable checks"}
+      "public_ip": {
+        "name": "Public IP"
+      },
+      "firewall_level": {
+        "name": "Firewall level (IPv4)"
+      },
+      "firewall_ipv6_level": {
+        "name": "Firewall level (IPv6)"
+      },
+      "port_forwarding": {
+        "name": "Port forwarding rules"
+      },
+      "ipv6_pinholes": {
+        "name": "IPv6 pinholes"
+      },
+      "devices_active": {
+        "name": "Active devices"
+      },
+      "unavailable_checks": {
+        "name": "Unavailable checks"
+      },
+      "speedtest_download": {
+        "name": "Download (Livebox test)"
+      },
+      "speedtest_upload": {
+        "name": "Upload (Livebox test)"
+      },
+      "speedtest_latency": {
+        "name": "Latency (Livebox test)"
+      },
+      "speedtest_last_run": {
+        "name": "Last speed test"
+      }
+    },
+    "button": {
+      "run_speedtest": {
+        "name": "Run speed test"
+      }
     }
   }
 }

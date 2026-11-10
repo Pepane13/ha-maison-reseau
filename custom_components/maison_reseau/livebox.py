@@ -6,6 +6,10 @@ The Livebox has a single administrator account, so the credentials technically a
 configuration changes. This client therefore enforces a strict allow-list: only the
 (service, method) pairs listed in ``ALLOWED_CALLS`` can be sent, and every one of them is a
 read ("get...") call. Any other call raises ``LiveboxForbiddenCall`` before a request is made.
+
+Single exception (10/11/2026, requested by the owner): the Livebox's own speed test. It is a
+diagnostic, not a configuration change. It is listed apart in ``DIAGNOSTIC_CALLS`` with fixed
+parameters that callers cannot override, and is only reachable through ``start_speedtest``.
 """
 
 from __future__ import annotations
@@ -34,6 +38,13 @@ ALLOWED_CALLS: dict[tuple[str, str], dict[str, Any]] = {
     ("NMC.Wifi", "get"): {},
     ("NMC.Guest", "get"): {},
     ("Devices", "get"): {"expression": "physical and !self and !voice"},
+    ("SpeedTest", "getWANResults"): {},
+    ("AutoDiag", "getDiagnosticsState"): {},
+}
+
+# Diagnostics that act on the box without changing its configuration. Fixed parameters.
+DIAGNOSTIC_CALLS: dict[tuple[str, str], dict[str, Any]] = {
+    ("AutoDiag", "executeDiagnostics"): {"id": "speedService", "usr": True},
 }
 
 
@@ -117,6 +128,9 @@ class LiveboxClient:
         if key not in ALLOWED_CALLS:
             raise LiveboxForbiddenCall(f"{service}:{method} is not an allowed read-only call")
         payload = dict(ALLOWED_CALLS[key]) if params is None else params
+        return await self._send(service, method, payload)
+
+    async def _send(self, service: str, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         async with self._lock:
             if not self._context:
                 await self._login()
@@ -138,6 +152,55 @@ class LiveboxClient:
         except (LiveboxError, asyncio.TimeoutError, OSError) as err:
             return False, str(err)
         return True, reply.get("status", reply.get("data"))
+
+    # ------------------------------------------------------------------ speed test
+
+    async def get_speedtest_results(self) -> dict[str, Any]:
+        """Last speed test run by the Livebox (read-only). Rates in Mbit/s."""
+        r = (await self.call("SpeedTest", "getWANResults")).get("status") or {}
+        down, up = r.get("Downstream") or {}, r.get("Upstream") or {}
+
+        def mbit(x: Any) -> float | None:
+            try:
+                return round(float(x) / 1000, 1)
+            except (TypeError, ValueError):
+                return None
+
+        return {
+            "state": r.get("status"),
+            "download": mbit(down.get("rate")),
+            "upload": mbit(up.get("rate")),
+            "latency": down.get("latency"),
+            "started": down.get("start"),
+            "upload_started": up.get("start"),
+        }
+
+    async def start_speedtest(self) -> None:
+        """Ask the Livebox to run its speed test (fixed diagnostic, no configuration change)."""
+        state = (await self.call("AutoDiag", "getDiagnosticsState")).get("status") or {}
+        if isinstance(state, dict) and state.get("DiagnosticsState") == "Requested":
+            raise LiveboxError("A Livebox diagnostic is already running")
+        key = ("AutoDiag", "executeDiagnostics")
+        await self._send(*key, dict(DIAGNOSTIC_CALLS[key]))
+
+    async def run_speedtest(self, timeout_s: float = 150, poll_s: float = 5) -> dict[str, Any]:
+        """Run the Livebox speed test and wait for new results."""
+        before = await self.get_speedtest_results()
+        await self.start_speedtest()
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        idle = 0
+        while loop.time() < deadline:
+            await asyncio.sleep(poll_s)
+            res = await self.get_speedtest_results()
+            if res["state"] == "Completed" and res["started"] and res["started"] != before["started"]:
+                return res
+            st = (await self.call("AutoDiag", "getDiagnosticsState")).get("status") or {}
+            if isinstance(st, dict) and st.get("DiagnosticsState") != "Requested":
+                idle += 1
+                if idle >= 3:
+                    raise LiveboxError(f"Livebox speed test ended without results ({st.get('DiagnosticsState')})")
+        raise LiveboxError("Livebox speed test timed out")
 
     # ------------------------------------------------------------------ snapshots
 

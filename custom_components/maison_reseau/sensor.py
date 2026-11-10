@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import EntityCategory
+from datetime import datetime
+
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.const import EntityCategory, UnitOfDataRate, UnitOfTime
+from homeassistant.util import dt as dt_util
 
 from .entity import MaisonReseauEntity
 
@@ -18,6 +21,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         RuleCount(d.security, "ipv6_pinholes", "ipv6_pinholes"),
         DeviceCount(d.security, "devices_active"),
         Unavailable(d.security, "unavailable_checks"),
+        SpeedValue(d.speedtest, "speedtest_download", "download"),
+        SpeedValue(d.speedtest, "speedtest_upload", "upload"),
+        SpeedLatency(d.speedtest, "speedtest_latency"),
+        SpeedLastRun(d.speedtest, "speedtest_last_run"),
     ])
 
 
@@ -89,3 +96,59 @@ class Unavailable(MaisonReseauEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         return {"details": self.coordinator.data.get("unavailable") or []}
+
+
+class _Speed(MaisonReseauEntity, SensorEntity):
+    @property
+    def available(self) -> bool:
+        return super().available and bool(self.coordinator.data)
+
+
+class SpeedValue(_Speed):
+    _attr_device_class = SensorDeviceClass.DATA_RATE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfDataRate.MEGABITS_PER_SECOND
+    _attr_suggested_display_precision = 0
+    _attr_icon = "mdi:speedometer"
+
+    def __init__(self, coordinator, key, field):
+        super().__init__(coordinator, key)
+        self._field = field
+
+    @property
+    def native_value(self):
+        return (self.coordinator.data or {}).get(self._field)
+
+
+class SpeedLatency(_Speed):
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfTime.MILLISECONDS
+    _attr_icon = "mdi:timer-outline"
+
+    @property
+    def native_value(self):
+        v = (self.coordinator.data or {}).get("latency")
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+
+class SpeedLastRun(_Speed):
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:clock-check-outline"
+
+    @property
+    def native_value(self) -> datetime | None:
+        v = (self.coordinator.data or {}).get("started")
+        if not v:
+            return None
+        parsed = dt_util.parse_datetime(str(v))
+        if parsed is None:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt_util.UTC)
+
+    @property
+    def extra_state_attributes(self):
+        return {"state": (self.coordinator.data or {}).get("state")}

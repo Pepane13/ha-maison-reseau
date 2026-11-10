@@ -104,3 +104,33 @@ def test_security_snapshot_reports_unavailable_parts():
 def test_devices():
     devices = run(livebox.LiveboxClient("192.168.1.1", "secret", FakeBox(REPLIES)).get_devices())
     assert devices[0]["mac"] == "AA:BB:CC:DD:EE:FF" and devices[0]["active"] is True
+
+
+SPEED_REPLIES = dict(REPLIES)
+
+
+def test_diagnostic_call_not_reachable_through_call():
+    client = livebox.LiveboxClient("192.168.1.1", "secret", FakeBox(REPLIES))
+    with pytest.raises(livebox.LiveboxForbiddenCall):
+        run(client.call("AutoDiag", "executeDiagnostics", {"id": "reboot"}))
+
+
+def test_speedtest_runs_and_returns_new_results():
+    box = FakeBox(dict(REPLIES))
+    box.replies[("SpeedTest", "getWANResults")] = {"status": {"status": "Completed", "Downstream": {"rate": 1000, "start": "2026-11-09T10:00:00Z", "latency": 4}, "Upstream": {"rate": 1000, "start": "2026-11-09T10:00:20Z"}}}
+    box.replies[("AutoDiag", "getDiagnosticsState")] = {"status": {"DiagnosticsState": "None"}}
+    box.replies[("AutoDiag", "executeDiagnostics")] = {"status": True}
+    client = livebox.LiveboxClient("192.168.1.1", "secret", box)
+    orig = box.__call__
+
+    async def fake_sleep(_):
+        box.replies[("SpeedTest", "getWANResults")] = {"status": {"status": "Completed", "Downstream": {"rate": 912345, "start": "2026-11-10T17:30:00Z", "latency": 3}, "Upstream": {"rate": 701234, "start": "2026-11-10T17:30:20Z"}}}
+
+    livebox.asyncio.sleep, saved = fake_sleep, livebox.asyncio.sleep
+    try:
+        res = run(client.run_speedtest(poll_s=0))
+    finally:
+        livebox.asyncio.sleep = saved
+    assert res["download"] == 912.3 and res["upload"] == 701.2 and res["latency"] == 3
+    sent = [c for c in box.calls if c[1] == "executeDiagnostics"]
+    assert sent == [("AutoDiag", "executeDiagnostics", {"id": "speedService", "usr": True}, "CTX")]
