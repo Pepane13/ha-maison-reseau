@@ -16,7 +16,7 @@ Claude Code has no access to the running Home Assistant. It never deploys, resta
 
 ## Source of truth
 
-- `main` is the only source of truth for the code. What runs on Home Assistant must be a tagged commit of `main`.
+- `main` is the only source of truth for the code. What runs on Home Assistant must be a commit of `main`, recorded in `DEPLOYED.md`.
 - No direct fix on the server. If an urgent fix has to be made on the server, the Projet HA session pushes it the same day to a `hotfix/<topic>` branch and opens a pull request; Claude Code rebases on it.
 - Before starting work: `git fetch`, rebase on `origin/main`, and list open pull requests and branches (`gh api repos/{owner}/{repo}/pulls`). If an open pull request touches the same files, build on it or wait; never start a parallel rewrite.
 - One active Claude Code session per repository at a time.
@@ -30,8 +30,8 @@ Claude Code has no access to the running Home Assistant. It never deploys, resta
    - the version bump (`manifest.json` / card header) and a `CHANGELOG.md` entry;
    - a **"Home Assistant impact"** section: new, renamed or removed entities, services, options or card keys, and the configuration changes the Projet HA session must make at deployment. Write "none" if none.
 4. **CI green** (ruff + pytest, or the card syntax checks) before asking for review. Stéphane merges.
-5. **Release.** After merge, tag `vX.Y.Z` on `main`.
-6. **Deployment** by the Projet HA session only: backup, deploy the tag, verify checksums, restart or reload if needed, record it in the project journal, then close the issue.
+5. **Deployment** by the Projet HA session only: backup, deploy the merged commit, verify checksums, restart or reload if needed, record it in the project journal.
+6. **Deployment record.** The Projet HA session then updates `DEPLOYED.md` (version, commit, date) on `main` and closes the issue. Claude Code never edits `DEPLOYED.md`. (Tags and releases cannot be created from Claude sessions; `DEPLOYED.md` replaces them.)
 
 ## Public interface — do not break silently
 
